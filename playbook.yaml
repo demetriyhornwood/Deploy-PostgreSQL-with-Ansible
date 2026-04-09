@@ -1,0 +1,103 @@
+---
+- name: Deploy PostgreSQL 14 on Ubuntu 22.04
+  hosts: Ubuntu
+  become: yes
+  vars_files:
+    - var/postgres.yml
+
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+  tasks:
+    - name: Install PostgreSQL packages
+      apt:
+        name:
+          - "postgresql-{{ postgres_version }}"
+          - "postgresql-contrib-{{ postgres_version }}"
+          - python3-psycopg2
+        state: present
+
+    - name: Initialize PostgreSQL cluster
+      shell: |
+        cd /tmp && \
+        sudo pg_ctlcluster {{ postgres_version }} main stop || true && \
+        sudo pg_dropcluster {{ postgres_version }} main || true && \
+        sudo pg_createcluster {{ postgres_version }} main --start
+      become: yes
+
+    - name: Ensure PostgreSQL is listening
+      wait_for:
+        port: 5432
+        timeout: 30
+
+    - name: Configure pg_hba.conf (COMPLETE REPLACE)
+      copy:
+        src: "files/pg_hba.conf"
+        dest: "/etc/postgresql/{{ postgres_version }}/main/pg_hba.conf"
+        owner: postgres
+        group: postgres
+        mode: '0640'
+        backup: yes
+      notify: reload postgresql
+
+    - name: IMMEDIATELY reload PostgreSQL
+      meta: flush_handlers
+
+    - name: Create postgres admin
+      community.postgresql.postgresql_user:
+        name: postgres
+        password: "{{ postgres_admin_pass }}"
+        state: present
+      become: yes
+      no_log: false
+
+    - name: Create app users
+      community.postgresql.postgresql_user:
+        name: "{{ item.name }}"
+        password: "{{ item.password }}"
+        role_attr_flags: CREATEDB,LOGIN
+        state: present
+      become: yes
+      no_log: true
+      loop: "{{ postgres_users }}"
+
+    - name: Install acl package for Ansible become_user
+      apt:
+        name: acl
+        state: present
+      become: yes
+
+    - name: Create databases
+      community.postgresql.postgresql_db:
+        name: "{{ item.name }}"
+        owner: "{{ item.owner }}"
+        state: present
+        login_unix_socket: /run/postgresql
+      become: yes
+      become_user: postgres
+      loop: "{{ databases }}"
+
+    - name: Configure postgresql.conf (listen_addresses)
+      lineinfile:
+        path: "/etc/postgresql/{{ postgres_version }}/main/postgresql.conf"
+        regexp: '^#?listen_addresses\s*='
+        line: "listen_addresses = 'localhost,{{ ansible_default_ipv4.address }}'"
+        backup: yes
+      notify: reload postgresql
+
+    - name: Configure postgresql.conf (max_connections)
+      lineinfile:
+        path: "/etc/postgresql/{{ postgres_version }}/main/postgresql.conf"
+        regexp: '^#?max_connections\s*='
+        line: "max_connections = 100"
+        backup: yes
+      notify: reload postgresql
+
+
+  handlers:
+    - name: reload postgresql
+      shell: pg_ctlcluster {{ postgres_version }} main reload || pg_ctlcluster {{ postgres_version }} main restart
+      become: yes

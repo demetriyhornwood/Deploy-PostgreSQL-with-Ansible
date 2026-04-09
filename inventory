@@ -1,0 +1,4 @@
+[Ubuntu]
+Ubuntu_test_01 ansible_host=10.144.1.47 ansible_ssh_pass=Fzytghjql$
+[Win]
+Win10_test ansible_host=10.144.1.48 ansible_user=ansible_user ansible_connection=winrm ansible_port=5985 ansible_winrm_server_cert_validation=ignore ansible_password=123 
