@@ -1,0 +1,3 @@
+---
+- name: reload postgresql
+  ansible.builtin.shell: pg_ctlcluster {{ postgres_version }} main reload || pg_ctlcluster {{ postgres_version }} main restart

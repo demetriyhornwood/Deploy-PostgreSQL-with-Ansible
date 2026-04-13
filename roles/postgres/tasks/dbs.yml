@@ -1,0 +1,10 @@
+---
+- name: Create databases
+  community.postgresql.postgresql_db:
+    name: "{{ item.name }}"
+    owner: "{{ item.owner }}"
+    state: present
+    login_unix_socket: /run/postgresql
+  become: yes
+  become_user: postgres
+  loop: "{{ databases }}"

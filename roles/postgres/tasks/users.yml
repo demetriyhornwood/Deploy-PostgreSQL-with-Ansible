@@ -1,0 +1,16 @@
+---
+- name: Create postgres admin
+  community.postgresql.postgresql_user:
+    name: postgres
+    password: "{{ postgres_admin_pass }}"
+    state: present
+  no_log: false
+
+- name: Create app users
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    role_attr_flags: CREATEDB,LOGIN
+    state: present
+  no_log: true
+  loop: "{{ postgres_users }}"
