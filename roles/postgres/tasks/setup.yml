@@ -1,0 +1,82 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install PostgreSQL packages
+  ansible.builtin.apt:
+    name:
+      - "postgresql-{{ postgres_version }}"
+      - "postgresql-contrib-{{ postgres_version }}"
+      - python3-psycopg2
+    state: present
+
+- name: Ensure PostgreSQL mount point exists
+  file:
+    path: /mnt/postgresql
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Set PostgreSQL environment variables.
+  template:
+    src: postgres.sh.j2
+    dest: /etc/profile.d/postgres.sh
+    mode: 0644
+  notify: restart postgresql
+
+- name: Ensure PostgreSQL data directory exists.
+  file:
+    path: "{{ postgresql_data_dir }}"
+    owner: "{{ postgres_admin_user }}"
+    group: "{{ postgresql_group }}"
+    state: directory
+    mode: 0700
+
+- name: Check if PostgreSQL database is initialized.
+  stat:
+    path: "{{ postgresql_data_dir }}/PG_VERSION"
+  register: pgdata_dir_version
+
+- name: Ensure PostgreSQL database is initialized.
+  command: "{{ postgresql_bin_path }}/initdb -D {{ postgresql_data_dir }}"
+  when: not pgdata_dir_version.stat.exists
+  become: true
+  become_user: "{{ postgres_admin_user }}"
+
+- name: Ensure PostgreSQL log directory exists.
+  file:
+    path: "{{ postgresql_effective_log_dir }}" 
+    owner: "{{ postgres_admin_user }}"
+    group: "{{ postgresql_group }}"
+    state: directory
+    mode: 0700
+    
+- name: Ensure PostgreSQL service is started
+  systemd:
+    name: "postgresql@{{ postgres_version }}-main"
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Ensure PostgreSQL is listening
+  ansible.builtin.wait_for:
+    port: 5432
+    timeout: 30
+
+- name: Configure pg_hba.conf
+  ansible.builtin.copy:
+    src: pg_hba.conf
+    dest: "/etc/postgresql/{{ postgres_version }}/main/pg_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+    backup: yes
+  notify: reload postgresql
+
+- name: IMMEDIATELY reload PostgreSQL
+  ansible.builtin.meta: flush_handlers
+
+
