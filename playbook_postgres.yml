@@ -1,0 +1,6 @@
+---
+- name: Deploy PostgreSQL 14 on Ubuntu 22.04
+  hosts: Ubuntu
+  become: yes
+  roles:
+    - postgres
