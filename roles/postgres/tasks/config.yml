@@ -1,8 +1,0 @@
----
-- name: Configure postgresql.conf (listen_addresses)
-  ansible.builtin.lineinfile:
-    path: "/etc/postgresql/{{ postgres_version }}/main/postgresql.conf"
-    regexp: '^#?listen_addresses\\s*='
-    line: "listen_addresses = '*'"
-    backup: yes
-  notify: reload postgresql
