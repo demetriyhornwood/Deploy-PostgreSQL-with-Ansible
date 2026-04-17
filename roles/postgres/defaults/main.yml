@@ -2,16 +2,11 @@ postgres_version: "14"
 
 
 postgres_admin_user: "postgres"
-postgres_admin_pass: "123"
+postgres_admin_pass: ""
+
+postgresql_group: "postgres"
 
 
-databases:
-  - name: testdb
-    owner: testuser
-
-databases_network: "0.0.0.0/0"
-
-postgres_users:
-  - name: testuser
-    password: "123"
-    role_attr_flags: CREATEDB
+postgresql_data_dir: "/mnt/postgresql/data"
+postgresql_effective_log_dir: "/mnt/postgresql/logs"
+postgresql_bin_path: "/usr/lib/postgresql/{{ postgres_version }}/bin"
