@@ -1,3 +1,10 @@
 ---
 - name: reload postgresql
-  ansible.builtin.shell: pg_ctlcluster {{ postgres_version }} main reload || pg_ctlcluster {{ postgres_version }} main restart
+  shell: systemctl reload "postgresql@{{ postgres_version }}-main" || systemctl restart "postgresql@{{ postgres_version }}-main"
+  listen: reload postgresql
+  changed_when: true
+
+- name: restart postgresql
+  shell: systemctl restart "postgresql@{{ postgres_version }}-main"
+  listen: restart postgresql
+  changed_when: true
