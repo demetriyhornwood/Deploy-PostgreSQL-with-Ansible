@@ -1,7 +1,7 @@
 postgres_version: "14"
 
 
-postgres_admin_user: "postgres"
+postgres_admin_user: ""
 postgres_admin_pass: ""
 
 postgresql_group: "postgres"
