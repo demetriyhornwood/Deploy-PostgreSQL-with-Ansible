@@ -1,4 +1,29 @@
 ---
+
+- name: Add PostgreSQL official APT repository
+  block:                          
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - wget
+          - lsb-release
+        state: present
+        update_cache: yes
+
+    - name: Import PostgreSQL GPG key
+      ansible.builtin.get_url:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        dest: /etc/apt/trusted.gpg.d/pgdg.asc
+        mode: '0644'
+
+    - name: Add PostgreSQL APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://apt.postgresql.org/pub/repos/apt jammy-pgdg main"
+        state: present
+        filename: pgdg
+  become: yes
+
+
 - name: Update apt cache
   ansible.builtin.apt:
     update_cache: yes
@@ -12,25 +37,21 @@
       - python3-psycopg2
     state: present
 
+
 - name: Ensure PostgreSQL mount point exists
   file:
-    path: /mnt/postgresql
+    path: "{{ postgresql_data_dir }}"
     state: directory
-    owner: root
-    group: root
+    owner: "{{ postgres_admin_user | default('postgres', true) }}"  
+    group: "{{ postgresql_group }}"
     mode: 0755
 
-- name: Set PostgreSQL environment variables.
-  template:
-    src: postgres.sh.j2
-    dest: /etc/profile.d/postgres.sh
-    mode: 0644
-  notify: restart postgresql
+
 
 - name: Ensure PostgreSQL data directory exists.
   file:
     path: "{{ postgresql_data_dir }}"
-    owner: "{{ postgres_admin_user }}"
+    owner: "{{ postgres_admin_user | default('postgres', true) }}"
     group: "{{ postgresql_group }}"
     state: directory
     mode: 0700
@@ -44,12 +65,12 @@
   command: "{{ postgresql_bin_path }}/initdb -D {{ postgresql_data_dir }}"
   when: not pgdata_dir_version.stat.exists
   become: true
-  become_user: "{{ postgres_admin_user }}"
+  become_user: "{{ postgres_admin_user | default('postgres', true) }}"
 
 - name: Ensure PostgreSQL log directory exists.
   file:
     path: "{{ postgresql_effective_log_dir }}" 
-    owner: "{{ postgres_admin_user }}"
+    owner: "{{ postgres_admin_user | default('postgres', true) }}"
     group: "{{ postgresql_group }}"
     state: directory
     mode: 0700
