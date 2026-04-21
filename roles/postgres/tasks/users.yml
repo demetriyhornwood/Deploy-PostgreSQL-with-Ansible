@@ -1,8 +1,7 @@
 ---
 - name: Create postgres admin
   community.postgresql.postgresql_user:
-    name: postgres
+    name: "{{ postgres_admin_user | default('postgres', true) }}"
     password: "{{ postgres_admin_pass | default(omit) }}"
     state: present
   no_log: false
-
