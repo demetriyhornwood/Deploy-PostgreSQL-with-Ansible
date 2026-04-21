@@ -1,0 +1,6 @@
+---
+- name: Deploy PostgreSQL 14 for APT
+  hosts: Ubuntu
+  become: yes
+  roles:
+    - postgres

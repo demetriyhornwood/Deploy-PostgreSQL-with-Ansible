@@ -1,0 +1,101 @@
+---
+
+- name: Add PostgreSQL official APT repository
+  block:                          
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - wget
+          - lsb-release
+        state: present
+        update_cache: yes
+
+    - name: Import PostgreSQL GPG key
+      ansible.builtin.get_url:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        dest: /etc/apt/trusted.gpg.d/pgdg.asc
+        mode: '0644'
+
+    - name: Add PostgreSQL APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://apt.postgresql.org/pub/repos/apt jammy-pgdg main"
+        state: present
+        filename: pgdg
+  become: yes
+
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install PostgreSQL packages
+  ansible.builtin.apt:
+    name:
+      - "postgresql-{{ postgres_version }}"
+      - "postgresql-contrib-{{ postgres_version }}"
+      - python3-psycopg2
+    state: present
+
+
+- name: Ensure PostgreSQL mount point exists
+  file:
+    path: "{{ postgresql_data_dir }}"
+    state: directory
+    owner: "{{ postgres_admin_user | default('postgres', true) }}"  
+    group: "{{ postgresql_group }}"
+    mode: 0755
+
+
+
+- name: Ensure PostgreSQL data directory exists.
+  file:
+    path: "{{ postgresql_data_dir }}"
+    owner: "{{ postgres_admin_user | default('postgres', true) }}"
+    group: "{{ postgresql_group }}"
+    state: directory
+    mode: 0700
+
+- name: Check if PostgreSQL database is initialized.
+  stat:
+    path: "{{ postgresql_data_dir }}/PG_VERSION"
+  register: pgdata_dir_version
+
+- name: Ensure PostgreSQL database is initialized.
+  command: "{{ postgresql_bin_path }}/initdb -D {{ postgresql_data_dir }}"
+  when: not pgdata_dir_version.stat.exists
+  become: true
+  become_user: "{{ postgres_admin_user | default('postgres', true) }}"
+
+- name: Ensure PostgreSQL log directory exists.
+  file:
+    path: "{{ postgresql_effective_log_dir }}" 
+    owner: "{{ postgres_admin_user | default('postgres', true) }}"
+    group: "{{ postgresql_group }}"
+    state: directory
+    mode: 0700
+    
+- name: Ensure PostgreSQL service is started
+  systemd:
+    name: "postgresql@{{ postgres_version }}-main"
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Ensure PostgreSQL is listening
+  ansible.builtin.wait_for:
+    port: 5432
+    timeout: 30
+
+- name: Configure pg_hba.conf
+  ansible.builtin.copy:
+    src: pg_hba.conf
+    dest: "/etc/postgresql/{{ postgres_version }}/main/pg_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+    backup: yes
+  notify: reload postgresql
+
+- name: IMMEDIATELY reload PostgreSQL
+  ansible.builtin.meta: flush_handlers
